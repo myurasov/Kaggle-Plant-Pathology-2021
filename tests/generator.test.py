@@ -15,7 +15,7 @@ class Test_Generator(unittest.TestCase):
             batch_size=self.batch_size,
             images_mean=128,
             images_std=255,
-            images_target_size=(896, 896),
+            images_target_size=(224, 225),
             images_augmentation=default_images_augmentation_params,
             cache_dir=gc["DATA_DIR"] + "/images_cache",
         )

@@ -1,13 +1,14 @@
 import os
-from glob import glob
 import re
+from glob import glob
 
 import numpy as np
-from PIL import Image
 import pandas as pd
+from PIL import Image
 from tensorflow import keras
 
 from src.config import c as gc
+from utils import list_indexes
 
 default_images_augmentation_params = {
     "hshear_p": 0.25,
@@ -35,7 +36,7 @@ class Generator(keras.utils.Sequence):
         batch_size=32,
         images_mean=128,
         images_std=255,
-        images_target_size=(896, 896),
+        images_target_size=(224, 224),
         cache_dir=gc["DATA_DIR"] + "/images_cache",
         images_augmentation=default_images_augmentation_params,
     ):
@@ -72,7 +73,7 @@ class Generator(keras.utils.Sequence):
 
         # label indexes in 1-hot representation
         label_ixs = sorted(list(set(" ".join(set(df.labels)).split(" "))))
-        label_ixs = dict([(x, label_ixs.index(x)) for x in label_ixs])
+        label_ixs = list_indexes(label_ixs)
         self.label_ixs = label_ixs
 
         labels = {}  # id: 1h
@@ -106,19 +107,41 @@ class Generator(keras.utils.Sequence):
 
         src_file = self.src_files[one_ix]
         sample_id = re.findall("/(\\w+)\\.jpg", src_file)[0]
-        cache_file = f"{self.cache_dir}/{sample_id}.npy"
+        cache_file = (
+            f"{self.cache_dir}/{sample_id}_"
+            + f"{self.images_target_size[0]}x"
+            + f"{self.images_target_size[1]}.npy"
+        )
 
         # read and cache file
         if not os.path.isfile(cache_file):
-            img = Image.open(src_file)
-            img = img.resize(self.images_target_size, resample=Image.BICUBIC)
-            img = np.array(img).astype(np.float16)
+            x = Image.open(src_file)
+            x = x.resize(self.images_target_size, resample=Image.BICUBIC)
+            x = np.array(x).astype(np.float16)
+            np.save(cache_file[:-4], x)
         else:
-            img = np.load(cache_file)
+            x = np.load(cache_file)
 
         # verify that cached data has the corect dimensions
-        assert img.shape == self.images_target_size + (3,)
+        # np array has HxWXC layout, unlike PIL Image's WxHxC
+        assert x.shape == (self.images_target_size[1], self.images_target_size[0], 3)
 
-        x, y = 0, 0
+        # if no csv file is provided, return no label
+        y = self.labels[sample_id] if self.csv_file else None
 
-        return (x, y)
+        # normalize
+        x -= self.images_mean
+        x /= self.images_std
+
+        # augment
+        if self.images_augmentation_params is not None:
+            x = self._augment_image(x)
+
+        return x, y
+
+    def _augment_image(self, np_data):
+        # TODO: augment image
+        return np_data
+
+    def on_epoch_end(self):
+        pass
