@@ -1,6 +1,5 @@
 import os
 import re
-from glob import glob
 
 import numpy as np
 import pandas as pd
@@ -39,7 +38,9 @@ class Generator(keras.utils.Sequence):
         images_target_size=(224, 224),
         cache_dir=gc["DATA_DIR"] + "/images_cache",
         images_augmentation=default_images_augmentation_params,
+        shuffle=True
     ):
+        self.shuffle = shuffle
         self.batch_size = batch_size
         self.csv_file = csv_file
         self.images_dir = images_dir
@@ -49,18 +50,20 @@ class Generator(keras.utils.Sequence):
         self.cache_dir = cache_dir
         self.images_augmentation_params = images_augmentation
 
-        # read inpuit files list
-        self.src_files = glob(f"{self.images_dir}/*.jpg")
-
         # create label index map
         if csv_file:
             self.labels = self._read_labels()
+            self.ids = list(self.labels.keys())  # list of ids
 
         # create cache dir for images
         if self.cache_dir is not None:
             os.makedirs(self.cache_dir, exist_ok=True)
 
-        self.n_samples = len(self.src_files)
+        # shuffle data, also repeated after each epoch if needed
+        if self.shuffle:
+            np.random.shuffle(self.ids)
+
+        self.n_samples = len(self.ids)
         self.n_batches = self.n_samples // self.batch_size
 
     def _read_labels(self):
@@ -100,12 +103,16 @@ class Generator(keras.utils.Sequence):
         b_Y = 0
         return (b_X, b_Y)
 
-    def get_one(self, one_ix):
+    def get_one(
+        self, one_ix, use_cached=True, write_cache=True, normalize=True, augment=True
+    ):
         """
         Get single item by absolute index
         """
 
-        src_file = self.src_files[one_ix]
+        id = self.ids[one_ix]
+        src_file = f"{self.images_dir}/{id}.jpg"
+
         sample_id = re.findall("/(\\w+)\\.jpg", src_file)[0]
         cache_file = (
             f"{self.cache_dir}/{sample_id}_"
@@ -114,11 +121,12 @@ class Generator(keras.utils.Sequence):
         )
 
         # read and cache file
-        if not os.path.isfile(cache_file):
+        if not use_cached or not os.path.isfile(cache_file):
             x = Image.open(src_file)
             x = x.resize(self.images_target_size, resample=Image.BICUBIC)
             x = np.array(x).astype(np.float16)
-            np.save(cache_file[:-4], x)
+            if write_cache:
+                np.save(cache_file[:-4], x)
         else:
             x = np.load(cache_file)
 
@@ -130,11 +138,12 @@ class Generator(keras.utils.Sequence):
         y = self.labels[sample_id] if self.csv_file else None
 
         # normalize
-        x -= self.images_mean
-        x /= self.images_std
+        if normalize:
+            x -= self.images_mean
+            x /= self.images_std
 
         # augment
-        if self.images_augmentation_params is not None:
+        if augment and self.images_augmentation_params is not None:
             x = self._augment_image(x)
 
         return x, y
@@ -144,4 +153,5 @@ class Generator(keras.utils.Sequence):
         return np_data
 
     def on_epoch_end(self):
-        pass
+        if self.shuffle:
+            np.random.shuffle(self.ids)

@@ -15,7 +15,7 @@ class Test_Generator(unittest.TestCase):
             batch_size=self.batch_size,
             images_mean=128,
             images_std=255,
-            images_target_size=(224, 225),
+            images_target_size=(224, 224),
             images_augmentation=default_images_augmentation_params,
             cache_dir=gc["DATA_DIR"] + "/images_cache",
         )
@@ -25,7 +25,9 @@ class Test_Generator(unittest.TestCase):
         self.assertEqual(self.generator.__len__(), 582)
 
     def test_get_one_1(self):
-        r = self.generator.get_one(0)
+        r = self.generator.get_one(
+            0, use_cached=False, write_cache=False, normalize=True, augment=True
+        )
 
 
 if __name__ == "__main__":
