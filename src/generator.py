@@ -60,6 +60,8 @@ class Generator(keras.utils.Sequence):
         self.n_samples = len(self.ids)
         self.n_batches = self.n_samples // self.batch_size
 
+        # self._read_files = {}
+
     def _read_labels(self):
         """
         Convert labels to one-hot representation
@@ -149,6 +151,11 @@ class Generator(keras.utils.Sequence):
                 np.save(cache_file[:-4], x)
         else:
             x = np.load(cache_file)
+        # elif id not in self._read_files:
+        #     x = np.load(cache_file)
+        #     self._read_files[id] = x
+        # else:
+        #     x = self._read_files[id]
 
         # verify that cached data has the corect dimensions
         # np array has HxWXC layout, unlike PIL Image's WxHxC
