@@ -81,6 +81,9 @@ RUN pip install matplotlib
 # copy external resources
 COPY docker/res /
 
+# supress too many annying messages from tf
+ENV TF_CPP_MIN_LOG_LEVEL=3
+
 # cleanup
 # RUN rm -rf /var/lib/apt/lists/*
 # RUN rm -rf /tmp/*

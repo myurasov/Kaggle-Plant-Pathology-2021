@@ -127,18 +127,25 @@ class Generator(keras.utils.Sequence):
         src_file = f"{self.images_dir}/{id}.jpg"
 
         sample_id = re.findall("/(\\w+)\\.jpg", src_file)[0]
+
         cache_file = (
             f"{self.cache_dir}/{sample_id}_"
             + f"{self.target_image_size[0]}x"
             + f"{self.target_image_size[1]}.npy"
         )
 
-        # read and cache file
-        if not use_cached or not os.path.isfile(cache_file):
+        # read from cache
+        if (
+            self.cache_dir is None
+            or use_cached is False
+            or os.path.isfile(cache_file) is False
+        ):
             x = Image.open(src_file)
             x = x.resize(self.target_image_size, resample=Image.BICUBIC)
             x = np.array(x)
-            if write_cache:
+
+            # save to cache
+            if write_cache and self.cache_dir is not None:
                 np.save(cache_file[:-4], x)
         else:
             x = np.load(cache_file)
