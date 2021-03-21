@@ -93,8 +93,27 @@ class Generator(keras.utils.Sequence):
         Produce batch, by batch index
         """
 
-        b_X = 0
-        b_Y = 0
+        assert b_ix < self.n_batches
+
+        b_X = np.zeros(
+            (self.batch_size, self.target_image_size[0], self.target_image_size[1], 3),
+            dtype=np.float16,
+        )
+
+        b_Y = np.zeros(
+            (self.batch_size, len(self.label_ixs)),
+            dtype=np.float16,
+        )
+
+        for i in range(self.batch_size):
+            b_X[i], b_Y[i] = self.get_one(
+                i + self.batch_size * b_ix,
+                use_cached=True,
+                write_cache=True,
+                normalize=True,
+                augment=True,
+            )
+
         return (b_X, b_Y)
 
     def get_one(
