@@ -49,16 +49,9 @@ def _mapping(x):
         x, use_cached=False, write_cache=True, normalize=False, augment=False
     )
 
-    # collect stats while at it
-    mean = np.mean(x)
-    std = np.mean(np.std(x, axis=2))
-    if std == np.inf or std == np.nan:
-        print(f"aaaa {x} aaaa")
-    return [mean, std]
-
 
 with Pool(cpu_count()) as pool:
-    stats = list(
+    list(
         tqdm(
             pool.imap(
                 _mapping,
@@ -67,10 +60,3 @@ with Pool(cpu_count()) as pool:
             total=g.n_samples,
         )
     )
-
-
-stats = np.array(stats)
-mean = np.mean(stats[:, 0])
-std = np.mean(stats[:, 1])
-print(f"* Mean: {mean:.2f}")
-print(f"* Std: {std:.2f}")

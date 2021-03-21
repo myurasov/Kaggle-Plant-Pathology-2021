@@ -76,7 +76,7 @@ class Generator(keras.utils.Sequence):
         labels = {}  # id: 1h
 
         for k, v in df.to_dict()["labels"].items():
-            y = np.zeros((len(label_ixs)), dtype=np.float32)
+            y = np.zeros((len(label_ixs)), dtype=np.float16)
             y[list(map(lambda x: label_ixs[x], v.split(" ")))] = 1.0
             labels[k[:-4]] = y
 
@@ -137,7 +137,7 @@ class Generator(keras.utils.Sequence):
 
         # normalize (sample-wise)
         if normalize:
-            x = x.astype(np.float64)
+            x = x.astype(np.float32)
             x = x - np.mean(x, axis=(0, 1))
             x = x / np.std(x, axis=(0, 1))
 
