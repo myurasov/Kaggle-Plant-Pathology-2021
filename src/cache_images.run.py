@@ -37,9 +37,9 @@ print(f"* Arguments:\n{pformat(vars(args))}")
 
 g = Generator(
     csv_file=f"{gc['DATA_DIR']}/src/{args.set}.csv",
-    images_dir=f"{gc['DATA_DIR']}/src/{args.set}_images",
-    images_target_size=tuple(args.size),
-    images_augmentation=None,
+    images_src_dir=f"{gc['DATA_DIR']}/src/{args.set}_images",
+    target_image_size=tuple(args.size),
+    image_augmentation_options=None,
     cache_dir=gc["DATA_DIR"] + "/images_cache",
 )
 
@@ -50,7 +50,11 @@ def _mapping(x):
     )
 
     # collect stats while at it
-    return [np.mean(x), np.mean(np.std(x, axis=2))]
+    mean = np.mean(x)
+    std = np.mean(np.std(x, axis=2))
+    if std == np.inf or std == np.nan:
+        print(f"aaaa {x} aaaa")
+    return [mean, std]
 
 
 with Pool(cpu_count()) as pool:
@@ -67,6 +71,6 @@ with Pool(cpu_count()) as pool:
 
 stats = np.array(stats)
 mean = np.mean(stats[:, 0])
-std = np.std(stats[:, 1])
+std = np.mean(stats[:, 1])
 print(f"* Mean: {mean:.2f}")
 print(f"* Std: {std:.2f}")

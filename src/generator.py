@@ -5,25 +5,23 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from tensorflow import keras
+from tensorflow.keras.preprocessing.image import (
+    random_brightness,
+    random_rotation,
+    random_shear,
+    random_shift,
+    random_zoom,
+)
 
 from src.config import c as gc
 from utils import list_indexes
 
-default_images_augmentation_params = {
-    "hshear_p": 0.25,
-    "hshear_range": [-0.5, 0.5],
-    "vshear_p": 0.25,
-    "vshear_range": [-0.5, 0.5],
-    "rotate_p": 0.25,
-    "rotate_angle_range": [-45, 45],
-    "vflip_p": 0.25,
-    "hflip_p": 0.25,
-    "zoom_p": 0.25,
-    "zoom_range": [0.5, 2],
-    "brightness_p": 0.25,
-    "brightness_range": [0.5, 2],
-    "saturation_p": 0.25,
-    "saturation_range": [-0.5, 2],
+default_image_augmenation_options = {
+    "rotation_max_degrees": 45,
+    "zoom_range": (0.75, 1.25),
+    "shift_max_fraction": {"w": 0.25, "h": 0.25},
+    "shear_max_degrees": 45,
+    "brightness_range": (0.5, 1.5),
 }
 
 
@@ -31,24 +29,20 @@ class Generator(keras.utils.Sequence):
     def __init__(
         self,
         csv_file,
-        images_dir,
+        images_src_dir,
         batch_size=32,
-        images_mean=128,
-        images_std=255,
-        images_target_size=(224, 224),
+        target_image_size=(224, 224),
         cache_dir=gc["DATA_DIR"] + "/images_cache",
-        images_augmentation=default_images_augmentation_params,
-        shuffle=True
+        image_augmentation_options=default_image_augmenation_options,
+        shuffle=False,
     ):
         self.shuffle = shuffle
         self.batch_size = batch_size
         self.csv_file = csv_file
-        self.images_dir = images_dir
-        self.images_mean = images_mean
-        self.images_std = images_std
-        self.images_target_size = images_target_size
+        self.images_dir = images_src_dir
+        self.target_image_size = target_image_size
         self.cache_dir = cache_dir
-        self.images_augmentation_params = images_augmentation
+        self.image_augmentation_options = image_augmentation_options
 
         # create label index map
         if csv_file:
@@ -116,15 +110,15 @@ class Generator(keras.utils.Sequence):
         sample_id = re.findall("/(\\w+)\\.jpg", src_file)[0]
         cache_file = (
             f"{self.cache_dir}/{sample_id}_"
-            + f"{self.images_target_size[0]}x"
-            + f"{self.images_target_size[1]}.npy"
+            + f"{self.target_image_size[0]}x"
+            + f"{self.target_image_size[1]}.npy"
         )
 
         # read and cache file
         if not use_cached or not os.path.isfile(cache_file):
             x = Image.open(src_file)
-            x = x.resize(self.images_target_size, resample=Image.BICUBIC)
-            x = np.array(x).astype(np.float16)
+            x = x.resize(self.target_image_size, resample=Image.BICUBIC)
+            x = np.array(x)
             if write_cache:
                 np.save(cache_file[:-4], x)
         else:
@@ -132,25 +126,59 @@ class Generator(keras.utils.Sequence):
 
         # verify that cached data has the corect dimensions
         # np array has HxWXC layout, unlike PIL Image's WxHxC
-        assert x.shape == (self.images_target_size[1], self.images_target_size[0], 3)
+        assert x.shape == (self.target_image_size[1], self.target_image_size[0], 3)
 
         # if no csv file is provided, return no label
         y = self.labels[sample_id] if self.csv_file else None
 
-        # normalize
-        if normalize:
-            x -= self.images_mean
-            x /= self.images_std
-
         # augment
-        if augment and self.images_augmentation_params is not None:
+        if augment and self.image_augmentation_options is not None:
             x = self._augment_image(x)
 
-        return x, y
+        # normalize (sample-wise)
+        if normalize:
+            x = x.astype(np.float64)
+            x = x - np.mean(x, axis=(0, 1))
+            x = x / np.std(x, axis=(0, 1))
 
-    def _augment_image(self, np_data):
-        # TODO: augment image
-        return np_data
+        return x.astype(np.float16), y
+
+    def _augment_image(self, x):
+        """
+        Randomply augment image
+        """
+
+        assert x.dtype == np.uint8
+
+        # common options
+        co = {
+            "row_axis": 0,
+            "col_axis": 1,
+            "channel_axis": 2,
+            # can be 'constant', 'nearest', 'reflect', 'wrap'
+            "fill_mode": "nearest",
+            "cval": 0.0,
+        }
+
+        # default_image_augmenation_options = {
+        #     "rotation_max_degrees": 45,
+        #     "zoom_range": (0.75, 1.25),
+        #     "shift_max_fraction": {"w": 0.25, "h": 0.25},
+        #     "shear_max_degrees": 45,
+        #     "brightness_range": (0.5, 1.5),
+        # }
+
+        o = self.image_augmentation_options
+
+        x = random_rotation(x, o["rotation_max_degrees"], **co)
+        x = random_shear(x, o["shear_max_degrees"], **co)
+        x = random_shift(
+            x, o["shift_max_fraction"]["w"], o["shift_max_fraction"]["h"], **co
+        )
+        x = random_zoom(x, o["zoom_range"], **co)
+        x = random_brightness(x, o["brightness_range"])
+
+        return x
 
     def on_epoch_end(self):
         if self.shuffle:

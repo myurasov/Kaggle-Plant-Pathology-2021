@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 from src.config import c as gc
-from src.generator import Generator, default_images_augmentation_params
+from src.generator import Generator, default_image_augmenation_options
 
 
 class Test_Generator(unittest.TestCase):
@@ -11,12 +11,12 @@ class Test_Generator(unittest.TestCase):
 
         self.generator = Generator(
             csv_file=f"{gc['DATA_DIR']}/src/train.csv",
-            images_dir=f"{gc['DATA_DIR']}/src/train_images",
+            images_src_dir=f"{gc['DATA_DIR']}/src/train_images",
             batch_size=self.batch_size,
             images_mean=128,
             images_std=255,
-            images_target_size=(224, 224),
-            images_augmentation=default_images_augmentation_params,
+            target_image_size=(224, 224),
+            image_augmentation_options=default_image_augmenation_options,
             cache_dir=gc["DATA_DIR"] + "/images_cache",
         )
 
