@@ -77,6 +77,7 @@ RUN pip install kaggle
 RUN pip install pandas
 RUN pip install numpy
 RUN pip install matplotlib
+RUN pip install tqdm
 
 # copy external resources
 COPY docker/res /
